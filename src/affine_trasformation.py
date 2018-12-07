@@ -12,5 +12,5 @@ if __name__ == '__main__':
     """
     PMC = image_transform("/media/WAMP/2018_11_22/2018_11_22 12_26_42")
     PMC.corresponding_image_points()
-    print(PMC.find_affine(save=True))
+    PMC.find_affine(save=True)
     

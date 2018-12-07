@@ -3,15 +3,16 @@
 """
 Created on Tue Nov 27 09:29:25 2018
 
-Analyze triggered events 
+Analyze triggered events. Assumes there is a file called 'high_value.txt'
+which will point to folders which were both triggered and had high overlap values
 
-@author: mitchell
+@author: mitchell scott
 """
-
 from wampImageProc import wampImageProc
 import os
 
 if __name__ == '__main__':
+    #Determine main directory to save data to
     open_directory = os.getcwd()
     open_directory = open_directory.split('/')
     open_directory = open_directory[:len(open_directory)-2]
