@@ -38,7 +38,7 @@ class wampImageProc:
         -get_hour: Determines hour from full image/folder name
     """
     
-    def __init__(self, root_dir = " ", affine_transformation = " ", 
+    def __init__(self, root_dir = " ", affine_transformation = " ", perspective_transfrom = " ", 
                                      hour_min = 0.0, hour_max = 24.0):
         """
         Args:
@@ -67,11 +67,20 @@ class wampImageProc:
         
         #Affine transformation
         if affine_transformation == " ":
-            self.H = np.array([[8.10993053*10**-1,1.27196567*10**0,-1.10498100*10**3], 
-                               [-.77104618*10**-1,8.67541888*10**-1,3.28146455*10**2]])       
+            self.H = np.array([[0.948657,0.262937,-226.404411], 
+                               [-0.210863,0.981926, 285.607620]])      
+
         else:
             file = open(affine_transformation, "r") 
             self.H = np.array(file.read().split(',')[0:6], dtype=np.float32).reshape((2,3))
+            
+        if perspective_transfrom == " ":
+            self.pers = np.identity(3)
+          
+        else:
+            file = open(perspective_transfrom, "r") 
+            self.pers = np.array(file.read().split(',')[0:9], dtype=np.float32).reshape((3,3))            
+        
             
         #Point to Triggers.txt file           
         trigger_path = self.root_dir + "/Triggers.txt"
@@ -86,7 +95,7 @@ class wampImageProc:
         #Find all subdirectory folders under roo directory
         self.sub_directories = self._subdirs()
         #Specify which value will trigger a high_value event
-        self.high_overlap = 1.6*10**7
+        self.high_overlap = 1.60957598*10**7
         #Initalized attributes
         self.high_overlap_list = []       
         self.ignore_events = []
@@ -304,8 +313,8 @@ class wampImageProc:
             images1 = self._get_paths(d1)
             images2 = self._get_paths(d2)
             #create a background subtraction object
-            fgbg1 = cv2.createBackgroundSubtractorMOG2()
-            fgbg2 = cv2.createBackgroundSubtractorMOG2()
+            fgbg1 = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
+            fgbg2 = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
             #zip images so that we can loop through image names
             images = zip(images1, images2)
             #initialize window size
@@ -343,19 +352,11 @@ class wampImageProc:
                     blur1 = cv2.medianBlur(fgmask1, 3)
                     blur2 = cv2.medianBlur(fgmask2, 3)
                     #Display images
-                    if display_images:
-                        if color:
-                            cv2.imshow('frame1',img1)
-                            cv2.imshow('frame2',img2)
-                        else:
-                            cv2.imshow('frame1',blur1)
-                            cv2.imshow('frame2',blur2)
                         #If cntrl + c, exit          
                     if overlap:
                         #Transform image one by an affine transformation
                         blur1_trans = cv2.warpAffine(blur1, self.H, 
                                         (blur1.shape[1],blur1.shape[0]))
-                        #Dilate the images
                         blur1_trans_dilate = cv2.dilate(blur1_trans,kernel,iterations = 1)
                         blur2_dilate = cv2.dilate(blur2,kernel,iterations = 1)
                         #Check Overlap between images using bitwise_and
@@ -366,9 +367,18 @@ class wampImageProc:
                         overlap_intensity.append(overlap_sum)
                         if display_overlap:
                             cv2.imshow('overlap', overlap_img)
+                            #cv2.imshow('overlap2', overlap2)
+                    if display_images:
+                        if color:
+                            cv2.imshow('frame1',img1)
+                            cv2.imshow('frame2',img2)
+                        else:
+                            cv2.imshow('frame1',blur1)
+                            cv2.imshow('frame2',blur2)                            
+                            
                     #If cntrl+c is pressed, exit
                     if display_images or display_overlap:
-                        k = cv2.waitKey(10)
+                        k = cv2.waitKey(1)
                         if k == 99:
                             cv2.destroyAllWindows()
                             sys.exit()  
