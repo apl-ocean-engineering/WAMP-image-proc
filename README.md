@@ -10,7 +10,7 @@ Numpy
 To install, clone package into desired directory  
 
 ## Codebase
-The main Python module is the wampImageProc.py file, which provides high-level functionality for processing WAMP image data. This module can process all WAMP images and check for correspondance between camera frames, provided you provide a base_path which points to the WAMP folder. The file image_proc.py shows an example setup using this module, ** but verify that the path (base_folder on line 26) is properly set ** or the script will not run.  
+The main Python module is the wampImageProc.py file, which provides high-level functionality for processing WAMP image data. This module can process all WAMP images and check for correspondance between camera frames, provided you provide a base_path which points to the WAMP folder. The file image_proc.py shows an example setup using this module, **but verify that the path (base_folder on line 26) is properly set** or the script will not run.  
 
 There are also a few other example scripts that were used to help determine camera properties. image_intensity.py will determine the intensity of all images within the root_folder. affine_transformation.py will calculate an affine transformation between the two images, using a specified image. triggered_events.py will display all photos specified by trigger_events.py.  
 
