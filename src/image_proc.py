@@ -11,13 +11,30 @@ saved to disk
 import glob
 from wampImageProc import wampImageProc
 import os
+import sys
 
 if __name__ == '__main__':
-    #Determine main directory to save data to
-    save_directory = os.getcwd()
-    save_directory = save_directory.split('/')
-    save_directory = save_directory[:len(save_directory)-2]
-    save_directory = "/".join(save_directory)   
+    #Determine if to save and what directory to save data to
+    save_info = False
+    overlap_save = False
+    path = None
+    if len(sys.argv) == 2:
+        save_info = bool(sys.argv[1])
+    elif len(sys.argv) == 3:   
+        save_info = bool(sys.argv[1])
+        overlap_save = bool(sys.argv[2])
+    elif len(sys.argv) == 4:
+        save_info = bool(sys.argv[1])
+        overlap_save = bool(sys.argv[2])
+        path = str(sys.argv[3])
+    
+    if save_info:
+        save_directory= path
+    elif save_info and path == None:
+        save_directory = os.getcwd()
+        save_directory = save_directory.split('/')
+        save_directory = save_directory[:len(save_directory)-2]
+        save_directory = "/".join(save_directory)   
     
     #Find overlap between images
     overlap = []
@@ -40,13 +57,15 @@ if __name__ == '__main__':
             #Check iamges which have high amounts of overlap
             high_value = (WIP.high_overlap_list)
             
-            """
-            SAVE DATA FOR IMAGE PROCCESSING
+            if save_info:
+                """
+                SAVE DATA FOR IMAGE PROCCESSING
+                """
+                with open(save_directory + '/high_value.txt', 'a+') as f:
+                    for item in high_value:
+                        f.write("%s\n" % item)    
+    if overlap_save:
+        with open(save_directory + '/overlap.txt', 'w+') as f:
+            for item in overlap:
+                f.write("%s\n" % item)
             
-            with open(save_directory + '/high_value.txt', 'a+') as f:
-                for item in high_value:
-                    f.write("%s\n" % item)    
-    with open(save_directory + '/overlap.txt', 'w+') as f:
-        for item in overlap:
-            f.write("%s\n" % item)
-            """
