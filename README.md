@@ -25,7 +25,10 @@ The main Python module is the wampImageProc.py file, which provides high-level f
 There are also a few other example scripts that were used to help determine camera properties. image_intensity.py will determine the intensity of all images within the root_folder. affine_transformation.py will calculate an affine transformation between the two images, using a specified image. triggered_events.py will display all photos specified by trigger_events.py.  
 
 ## Running the code
-The python script image_proc.py will traverse over all images specified by the base_folder and search for high_trigger images which also correspond to sonar triggers. It will (optinally) save trigger and overlap data to folder <path_to_WAMP-image-proc>/data. To run in Linux, run  ./image_proc.py \[--help\]\[--save_trigger_data bool (default False)\]\[--save_overlap_data bool (default False)\]    
+The python script image_proc.py will traverse over all images specified by the base_folder and search for high_trigger images which also correspond to sonar triggers. It will (optinally) save trigger and overlap data to folder <path_to_WAMP-image-proc>/data. To run in Linux, run:
+```
+./image_proc.py \[--help\]\[--save_trigger_data bool (default False)\]\[--save_overlap_data bool (default False)\]
+```    
 
 Example 1:
 ```
