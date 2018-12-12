@@ -24,7 +24,8 @@ class wampImageProc:
         -high_overlap (float): Overlaps above this value are specfied as having
             a higher than normal overlap
         -high_overlap_list (list<str>): List of all folders which contains a 
-            set of images with a background subtracted overlap above trigger_value
+            set of images with a background subtracted overlap above 
+            trigger_value
         -sub_directories (list<str>): List of all subdirectories
         -ignore_events (list<str>): All events which should be ignored in a
             background subtraction event
@@ -38,12 +39,13 @@ class wampImageProc:
         -get_hour: Determines hour from full image/folder name
     """
     
-    def __init__(self, root_dir = " ", affine_transformation = " ", perspective_transfrom = " ", 
-                                     hour_min = 0.0, hour_max = 24.0):
+    def __init__(self, root_dir = " ", affine_transformation = " ", 
+                 perspective_transfrom = " ", hour_min = 0.0, hour_max = 24.0):
         """
         Args:
             [root_dir(string)]: Location of the root directory where images are
-            [affine_transformation(str)]: Path to file containing affine_tranformation
+            [affine_transformation(str)]: Path to file containing 
+                affine_tranformation
             [hour_min(float)]: Minimium hour to consider images. Images which
                 are below this amount will be discarded
             [hour_max(float)]: Maximium hour to consider images. Images which
@@ -54,8 +56,8 @@ class wampImageProc:
         """
         #Dictionary to transform dates from motnh to number
         self.dates = {'Jan':'01', 'Feb':'02', 'March':'03', 'April':'04', 
-                      'May':'05', 'June':'06', 'July':'07', 'Aug':'08','Sep':'09',
-                      'Oct':'10', 'Nov':'11', 'Dec':'12'}
+                      'May':'05', 'June':'06', 'July':'07', 'Aug':'08',
+                      'Sep':'09', 'Oct':'10', 'Nov':'11', 'Dec':'12'}
         #Find physical location of root directory
         if root_dir == " ":
             self.root_dir = os.getcwd()
@@ -72,14 +74,16 @@ class wampImageProc:
 
         else:
             file = open(affine_transformation, "r") 
-            self.H = np.array(file.read().split(',')[0:6], dtype=np.float32).reshape((2,3))
+            self.H = np.array(file.read().split(',')[0:6], 
+                              dtype=np.float32).reshape((2,3))
             
         if perspective_transfrom == " ":
             self.pers = np.identity(3)
           
         else:
             file = open(perspective_transfrom, "r") 
-            self.pers = np.array(file.read().split(',')[0:9], dtype=np.float32).reshape((3,3))            
+            self.pers = np.array(file.read().split(',')[0:9], 
+                                 dtype=np.float32).reshape((3,3))            
         
             
         #Point to Triggers.txt file           
@@ -102,12 +106,14 @@ class wampImageProc:
         
         
 
-    def image_overlap(self, display_images = False, display_overlap = False,ignore_triggers = False, only_triggers = False):
+    def image_overlap(self, display_images = False, display_overlap = False,
+                          ignore_triggers = False, only_triggers = False):
         """
         Check the overlap of images, check image intensity
         Inputs:
             [display_images(bool)]: Display the images
-            [display_overlap(bool)]: Display the overlap between transformed images
+            [display_overlap(bool)]: Display the overlap between transformed 
+                images
         Returns:
             None
         """         
@@ -115,16 +121,17 @@ class wampImageProc:
         for subdir in self.sub_directories:
             #subdir is a string
             #Call self._background_subtraction with overlap on
-            #print(subdir)
-            overlap_intensity.extend(self._background_subtraction(subdir + "Manta 1/*.jpg", 
-                                    subdir + "Manta 2/*.jpg", overlap = True, 
-                                    display_images = display_images, 
-                                    display_overlap= display_overlap,
-                                    ignore_triggers = ignore_triggers, 
-                                    only_triggers = only_triggers))    
+            overlap_intensity.extend(
+                    self._background_subtraction(subdir + "Manta 1/*.jpg", 
+                    subdir + "Manta 2/*.jpg", overlap = True, 
+                    display_images = display_images, 
+                    display_overlap= display_overlap,
+                    ignore_triggers = ignore_triggers, 
+                    only_triggers = only_triggers))    
         return overlap_intensity
             
-    def background_subtraction(self, ignore_triggers = False, only_triggers = False, display_images = False):
+    def background_subtraction(self, ignore_triggers = False, 
+                               only_triggers = False, display_images = False):
         """
         Run a background subtraction algorithm on all images in desired directory
         
@@ -147,7 +154,8 @@ class wampImageProc:
                     only_triggers = only_triggers)     
             
             
-    def single_directiory_background_subtraction(self, directory, only_triggers = False):
+    def single_directiory_background_subtraction(self, directory, 
+                                                 only_triggers = False):
         '''
         Runs background subtraction on all images in desired subfolder location
         
@@ -269,7 +277,10 @@ class wampImageProc:
                 
                 
     
-    def _background_subtraction(self, d1, d2, overlap = False, display_images = False, color = False, display_overlap=False, flag = False, ignore_triggers = False, only_triggers = False):
+    def _background_subtraction(self, d1, d2, overlap = False, 
+                                display_images = False, color = False, 
+                                display_overlap=False, flag = False, 
+                                ignore_triggers = False, only_triggers = False):
         """
         Run background subtraction algorithm using openCv 
         createBackgroundSubtractorMOG2. Will do background subtraction for all
@@ -337,7 +348,8 @@ class wampImageProc:
                 
                 """
                 Loop through all image frames and run background subtraction.
-                If overlap is selected, compare the overlap between the two images
+                If overlap is selected, compare the overlap between the two 
+                images
                 """
                 date_time1 = fname1.split("/")
                 if date_time1[-1][:-7] not in self.ignore_events:
@@ -357,10 +369,12 @@ class wampImageProc:
                         #Transform image one by an affine transformation
                         blur1_trans = cv2.warpAffine(blur1, self.H, 
                                         (blur1.shape[1],blur1.shape[0]))
-                        blur1_trans_dilate = cv2.dilate(blur1_trans,kernel,iterations = 1)
+                        blur1_trans_dilate = cv2.dilate(
+                                blur1_trans,kernel,iterations = 1)
                         blur2_dilate = cv2.dilate(blur2,kernel,iterations = 1)
                         #Check Overlap between images using bitwise_and
-                        overlap_img = np.bitwise_and(blur1_trans_dilate, blur2_dilate)
+                        overlap_img = np.bitwise_and(
+                                blur1_trans_dilate, blur2_dilate)
                         overlap_sum = np.sum(overlap_img)
                         if overlap_sum > self.high_overlap:
                             self.high_overlap_list.append(fname1.split("/")[4])
@@ -489,7 +503,8 @@ class image_transform:
         if save:
             #Save data to text file
             np.savetxt(path+"perspective_transform.txt", 
-                       perspective_transform.reshape(1,9), delimiter=',', fmt="%f") 
+                       perspective_transform.reshape(1,9), 
+                       delimiter=',', fmt="%f") 
         
         return perspective_transform
     
@@ -514,7 +529,8 @@ class image_transform:
         if save:
             #Save data to text file
             np.savetxt(path+"homography_transform.txt", 
-                       homography_transform.reshape(1,6), delimiter=',', fmt="%f")         
+                       homography_transform.reshape(1,6), 
+                       delimiter=',', fmt="%f")         
         
         return homography_transform   
 
