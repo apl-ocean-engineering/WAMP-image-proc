@@ -15,7 +15,7 @@ from os.path import dirname, abspath
 import glob
 from wampImageProc import wampImageProc
 
-
+#Setup logging
 logger = logging.getLogger()
 handler = logging.StreamHandler()
 formatter = logging.Formatter(
@@ -24,17 +24,17 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+#Parse inputs
 parser = argparse.ArgumentParser(description='Save generated camera info')
 parser.add_argument('--save_trigger_data', default = 'False',
             help = 'Set to True to save stereo triggers data to data folder')
 parser.add_argument('--save_overlap_data', default = 'False',
             help = 'Set to True to save overlap data to data folder')
 
-parent_directory = dirname(dirname(abspath(__file__)))
 args = parser.parse_args()
-
 save_triggers = bool(args.save_trigger_data)
 save_overlap = bool(args.save_overlap_data)
+
 save_directory = dirname(dirname(abspath(__file__))) #/<path_to_workspace>/data
 
 """
