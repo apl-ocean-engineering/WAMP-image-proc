@@ -592,7 +592,7 @@ class image_transform:
         #Must be float 32s to work in OpenCV
         pnts1 = np.float32(pnts1)
         pnts2 = np.float32(pnts2)  
-        
+
         return pnts1, pnts2
         
     def _mouse_click1(self,event,x,y,flags,param):
@@ -630,8 +630,8 @@ class image_transform:
             -manta1_subdirs, manta2_subdirs (list<str>): Paths for all images
         """
         #Get list of all folders in the current directory
-        manta1_subdirs = glob.glob(self.images_path + "/Manta 1/*.jpg")
-        manta2_subdirs = glob.glob(self.images_path + "/Manta 2/*.jpg")
+        manta1_subdirs = sorted(glob.glob(self.images_path + "/Manta 1/*.jpg"))
+        manta2_subdirs = sorted(glob.glob(self.images_path + "/Manta 2/*.jpg"))
         
         return manta1_subdirs, manta2_subdirs
     
