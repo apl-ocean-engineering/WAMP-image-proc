@@ -407,7 +407,7 @@ class wampImageProc:
         """
         sys.exit()
         
-class image_transform:
+class imageTransforms(object):
     """
     Class to help determine transformation between frames in two WAMP cameras
     
@@ -458,6 +458,7 @@ class image_transform:
         #Define mouse callback functions
         cv2.setMouseCallback('image1',self._mouse_click1)
         cv2.setMouseCallback('image2',self._mouse_click2)
+        #print(self.m1_subdirectories)
         #Loop through all images in subdirectory location
         print("Click on the same point in both images")
         print("Press enter to move to next corresponding images")
@@ -480,6 +481,9 @@ class image_transform:
                 cv2.destroyAllWindows()
                 break            
         cv2.destroyAllWindows()
+        
+        
+        
         
     def find_perspective(self, save = False, path=""):
         """
@@ -557,10 +561,11 @@ class image_transform:
         if save:
             #Save data to text file
             np.savetxt(path+"affine_transform.txt", 
-                       affine_transform.reshape(1,6), delimiter=',', fmt="%f") 
+                       affine_transform.reshape(1,6), delimiter=',', 
+                       fmt="%f") 
             
-        return affine_transform          
-        
+        return affine_transform     
+      
     def get_points(self):
         """
         Return corresponding image points
@@ -586,27 +591,39 @@ class image_transform:
         #Organize points
         pnts1 = []
         pnts2 = []
+        points1 = []
+        points2 = []
         for i in range(0, len(self.x1_points)):
-            pnts1.append((self.x1_points[i], self.y1_points[i]))
-            pnts2.append((self.x2_points[i], self.y2_points[i]))
+            pnts1.append(np.array([[np.float32(self.x1_points[i]), 
+                                    np.float32(self.y1_points[i])]]))
+            pnts2.append(np.array([[np.float32(self.x2_points[i]), 
+                                    np.float32(self.y2_points[i])]]))
+        
         #Must be float 32s to work in OpenCV
         pnts1 = np.float32(pnts1)
         pnts2 = np.float32(pnts2)  
-
-        return pnts1, pnts2
-        
+        pnts1 = [pnts1]
+        pnts2 = [pnts2]
+        for i in range(0, 4):
+            points1.append(pnts1)
+            points2.append(pnts2)
+        return points1[0], points2[0]
+    
+    
     def _mouse_click1(self,event,x,y,flags,param):
         """
         Callback function for mouse click event on image1 frame
         
         Places clicked points into x1_ and y1_points lists
         """
+        
         if event == cv2.EVENT_LBUTTONDOWN:
             self.x1_points.append(x)
             self.y1_points.append(y)
             #Draw circle where clicked
-            cv2.circle(self.img1,(x,y), 20, (255,255,255), -1)
+            cv2.circle(self.img1,(x,y), 20, (255,0,0), -1)
             cv2.imshow('image1', self.img1)
+            
     
     def _mouse_click2(self,event,x,y,flags,param):
         """
@@ -618,7 +635,7 @@ class image_transform:
             self.x2_points.append(x)
             self.y2_points.append(y)
             #Draw circle where clicked
-            cv2.circle(self.img2,(x,y), 20, (255,255,255), -1)
+            cv2.circle(self.img2,(x,y), 20, (255,0,0), -1)
             cv2.imshow('image2', self.img2)
     
     def _subdirs(self):
@@ -639,63 +656,293 @@ class image_transform:
         """
         Exit system if SIGINT
         """
-        sys.exit()
+        sys.exit()                         
     
+class calibration(imageTransforms):
+    #TODO: Why can't I inherit mouse click functions?? 
+    """
+    Class to help with image intrinsic and stereo calibration using OpenCV. 
+    Inherits from imageTransforms
     
+    Methods:
+        -intrinsic_calibration: Intrinsic callibration using checkerboard method
+        -stereo_calibrate: Stereo calibration between two stereo cameras        
+    """    
+    def __init__(self):
+        super(calibration, self).__init__(' ')
+        
+    def intrinsic_calibration(self, intrinsic_images_path = ' ', save = False, 
+                              base_save_path = ' '):
+        """
+        Intrinsic calibration of a camera. User must point to location of 
+        images containing a series of checkerboard rotations
+        
+        Args:
+            [intrinsic_images_path(str)]: Path which points to location of 
+                calibration images (should be in form /img1time and /img2time 
+                see calibration_images_save.py)
+            [save(bool)]: Whether or not to save intrinsic calibration
+            [base_save_path(str)]: Location to save intrinsic values
+        
+        Returns:
+            None
+            
+        """
+        #Generate 3D world points (arbitrary)
+        objp = np.zeros((6*8,3), np.float32)
+        objp[:,:2] = np.mgrid[0:8,0:6].T.reshape(-1,2)
+        #Termination criteria
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 
+                    30, 0.001)
+        #Initalize image window
+        cv2.namedWindow('img1', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('img1', 800,800)
+        cv2.namedWindow('img2', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('img2', 800,800)
+        #Checkerboard points
+        imgpoints1 = [] # 2d points in image plane.
+        imgpoints2 = []
+        i = 0
+        #Load images
+        imgs1 = sorted(glob.glob(intrinsic_images_path + '/img1*.png'))
+        save_path1 = base_save_path + '/camera1/'
+        imgs2 = sorted(glob.glob(intrinsic_images_path + '/img2*.png'))
+        save_path2 = base_save_path + '/camera1/'
+        
+        images = zip(imgs1, imgs2)
+        
+        objpoints = [] # 3d point in real world space
+        #Loop through all images to detect checkerboard corners
+        for fname1, fname2 in images:
+            i += 1
+            #Load images
+            img1 = cv2.imread(fname1)
+            img2 = cv2.imread(fname2)
+            cv2.imshow('img1', img1)
+            cv2.imshow('img2', img2)
+            if i == 1:
+                print("Click ENTER if both checkerboards are visable to save checkerboards for calibration")
+                #First loop, wait for a couple seconds
+                cv2.waitKey(5000)
+            k = cv2.waitKey(1000)
+            #Pause for a second. If enter is pressed, use frame for calibtation
+            if k == 10:   
+                #Convert to grayscale for corner detection
+                gray1 = cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
+                gray2 = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
+                # Find the chess board corners
+                ret1, corners_cam1 = cv2.findChessboardCorners(
+                        gray1, (8,6), None)
+                ret2, corners_cam2 = cv2.findChessboardCorners(
+                        gray2, (8,6), None)
+                #If checkerboards are seen in both frames (propably uneccessary...)
+                #TODO: Remove this condition for more points or nah?
+                if ret1 and ret2:
+                    objpoints.append(objp)
+                    #Find corners
+                    corners_cam1_2 = cv2.cornerSubPix(
+                            gray1,corners_cam1,(11,11),(-1,-1),criteria)       
+                    corners_cam2_2 = cv2.cornerSubPix(
+                            gray1,corners_cam2,(11,11),(-1,-1),criteria) 
+                    #Append points
+                    imgpoints1.append(corners_cam1_2)
+                    imgpoints2.append(corners_cam2_2)
+                    # Draw and display the corners
+                    img1 = cv2.drawChessboardCorners(img1, (8,6), 
+                                                     corners_cam1_2,ret1)
+                    img2 = cv2.drawChessboardCorners(img2, (8,6), 
+                                                     corners_cam2_2,ret2)
+                    #Show images with checkerboards
+                    cv2.imshow('img1',img1)
+                    cv2.imshow('img2',img2)
+                    cv2.waitKey(5) 
+        #Find intrinsics and save                      
+        ret1, mtx1, dist1, rvecs1, tvecs1 = cv2.calibrateCamera(
+                        objpoints, imgpoints1, gray1.shape[::-1], None, None)
+                                            
+        
+        if save:
+            np.savetxt(save_path1 + 'intrinsic_matrix.csv', mtx1, 
+                       fmt='%1.3f', delimiter=",")
+            np.savetxt(save_path1 + 'distortion_coeffs.csv', dist1, 
+                       fmt='%1.3f', delimiter=",")  
+        
+        print('Intrinsic Matrix Camera 1', mtx1)
+        print('Distortion Coefficients Camera 1', dist1)
+        
+        ret2, mtx2, dist2, rvecs2, tvecs2 = cv2.calibrateCamera(objpoints, 
+                                            imgpoints2, gray2.shape[::-1], 
+                                            None, None)
+        if save:
+            np.savetxt(save_path2 + 'intrinsic_matrix.csv', mtx2, 
+                       fmt='%1.3f', delimiter=",")
+            np.savetxt(save_path2 + 'distortion_coeffs.csv', dist2, 
+                       fmt='%1.3f', delimiter=",")   
+        
+        print('Intrinsic Matrix Camera 2', mtx1)
+        print('Distortion Coefficients Camera 2', dist1)
+        
+    def stereo_calibrate(self, fname1, fname2, save = False, 
+                         load_intrinsics = True, intrinsics_load_path = ' ', 
+                         stereo_save_path = ' ', mtx1 = None, dist1 = None, 
+                         mtx2 = None, dist2 = None):
+        """
+        Stereo calibration of two cameras. User must either load matricies from
+        source (currently must be .csv file) or include intrinics for both 
+        cameras
+        
+        Args:
+            fname1(str): Calibration image path1
+            fname2(str): Calibration image path2
+            [save(bool)]: To save extrinsic calibration or not
+            [load_intrinsics(bool)]: Load intrinics. If false, user must
+                supply intrnic values
+            [intrinsics_load_path(str)]: Path to intrinsic values.
+            [stereo_save_path(bool)]: Location to save extrinsic values
+            [mtx1 and mtx2 (np.array)]: Intrnisic matricies for both cameras
+            [dist1 and dist2 (np.array)]: Distortion coefficients 
+        
+        Returns:
+            None
+            
+        """        
+        if load_intrinsics:
+            #Try to load intrnsic values if specified, otherwise raise error
+            try:
+                mtx1, dist1 = self._load_intrinsics(
+                        intrinsics_load_path + '/camera1')
+                mtx2, dist2 = self._load_intrinsics(
+                        intrinsics_load_path + '/camera2')
+            except:
+                raise AttributeError('No Intrinsics found')
+        #Check that the matricies are of proper form
+        else:
+            if not type(mtx1) != type(np.array()):
+                raise ValueError("R is not of type np.array")
+            if not type(dist1) != type(np.array()):
+                raise ValueError("R is not of type np.array")
+            if not type(mtx2) != type(np.array()):
+                raise ValueError("R is not of type np.array")
+            if not type(dist2) != type(np.array()):
+                raise ValueError("R is not of type np.array")   
+        #Get corresponding images
+        self._image_mouse_click(fname1, fname2)
+        #Return clicked points
+        pnts1, pnts2 = self.get_points()
+        img = cv2.imread(fname1)
+        imshape = (img.shape[0], img.shape[1])
+        #3d points, arbitrary
+        objp = np.zeros((6*7,3), np.float32)
+        objp[:,:2] = np.mgrid[0:7,0:6].T.reshape(-1,2)
+        objpoints = []
+        objpoints.append(objp[0:pnts1[0].shape[0]])
+        #Termination criteria
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 
+                    30, 0.001)
+        #Stereo calibtation
+        retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T,\
+        E, F = cv2.stereoCalibrate(
+                objpoints, pnts1, pnts2, mtx1, dist1, mtx2, dist2, imshape, 
+                criteria = criteria, flags=cv2.CALIB_FIX_INTRINSIC)
+
+            
+        print('Rotation Matrix', R)
+        print('Translation Vector', T)
+        print('Essential Matrix', E)
+        print('Fundemental Matrix', F)
+        print('Transformation Matrix (RT)', np.dot(R,T))
     
+        if save:
+            np.savetxt(stereo_save_path + '/rotation_matrix.csv', 
+                       R, fmt='%1.3f', delimiter=",")
+            np.savetxt(stereo_save_path + '/translation_matrix.csv', 
+                       T, fmt='%1.3f', delimiter=",")
+            np.savetxt(stereo_save_path + '/essential_matrix.csv', 
+                       E, fmt='%1.3f', delimiter=",")
+            np.savetxt(stereo_save_path + '/fundemental_matrix.csv', 
+                       F, fmt='%1.3f', delimiter=",")             
+
+    def _load_intrinsics(self, load_path):
+        """
+        Load camera intrinsics
+        Args:
+            load_path(str): Path to load intrinsics from
+        Returns:
+            mtx(np.array): Intrinsic matrix
+            dist(np.array): Distortion matrix
+        """
+        mtx = np.array(np.loadtxt(load_path + '/intrinsic_matrix.csv', 
+                                  dtype = float, delimiter=','))
+        dist = np.array(np.loadtxt(load_path + '/distortion_coeffs.csv',
+                                   dtype = float, delimiter=','))
+        
+        mtx.reshape((3,3))
+        
+        return mtx, dist         
+
+    def _mouse_click1(self,event,x,y,flags,param):
+        """
+        Callback function for mouse click event on image1 frame
+        
+        Places clicked points into x1_ and y1_points lists
+        """
+        
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.x1_points.append(x)
+            self.y1_points.append(y)
+            #Draw circle where clicked
+            cv2.circle(self.img1,(x,y), 20, (255,0,0), -1)
+            cv2.imshow('image1', self.img1)
     
+    def _mouse_click2(self,event,x,y,flags,param):
+        """
+        Callback function for mouse click event on image2 frame
+        
+        Places clicked points into x2_ and y2_points lists
+        """        
+        if event == cv2.EVENT_LBUTTONDOWN:
+            self.x2_points.append(x)
+            self.y2_points.append(y)
+            #Draw circle where clicked
+            cv2.circle(self.img2,(x,y), 20, (255,0,0), -1)
+            cv2.imshow('image2', self.img2)    
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    def _image_mouse_click(self, fname1, fname2):
+        """
+        Determine coressponding image points between the frames
+        
+        Will display two images. User must click on identical point
+        in two frames. x#_points, and y#_points will populate as the user 
+        clicks on points  
+        
+        Args:
+            fname1, fname2 (str): Two paths pointing to calibration image frame
+        """
+        cv2.namedWindow('image1', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('image1', 1200,1200)
+        cv2.namedWindow('image2', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('image2', 1200,1200)
+        #Define mouse callback functions
+        cv2.setMouseCallback('image1',self._mouse_click1)
+        cv2.setMouseCallback('image2',self._mouse_click2)        
+        print("Click on the same point in both images")
+        print("Press enter to move to next corresponding images")
+        print("Press 'f' to finish")
+        print("Press cntrl+c to quit")
+        signal.signal(signal.SIGINT, self._sigint_handler)
+        self.img1 = cv2.imread(fname1)
+        self.img2 = cv2.imread(fname2)
+        
+        cv2.imshow('image1', self.img1)      
+        cv2.imshow('image2', self.img2)
+        k = cv2.waitKey(0)
+        if k == 99:
+            cv2.destroyAllWindows()
+            sys.exit()  
+        if k == 102:
+            cv2.destroyAllWindows()
+        cv2.destroyAllWindows()      
+
     
     
         
