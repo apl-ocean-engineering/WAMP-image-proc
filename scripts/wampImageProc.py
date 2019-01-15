@@ -11,6 +11,8 @@ import numpy as np
 import os
 import sys
 import signal
+import time
+import logging
 
 
 class wampImageProc:
@@ -99,10 +101,17 @@ class wampImageProc:
         #Find all subdirectory folders under roo directory
         self.sub_directories = self._subdirs()
         #Specify which value will trigger a high_value event
-        self.high_overlap = 1.60957598*10**7
+        self.high_overlap = 1.60957598*10**8
         #Initalized attributes
         self.high_overlap_list = []       
         self.ignore_events = []
+        
+        self.logger = logging.getLogger()
+        handler = logging.StreamHandler()
+        logging.Formatter(
+            '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+        self.logger.addHandler(handler)
+        self.logger.setLevel(logging.DEBUG)
         
         
 
@@ -127,7 +136,7 @@ class wampImageProc:
                     display_images = display_images, 
                     display_overlap= display_overlap,
                     ignore_triggers = ignore_triggers, 
-                    only_triggers = only_triggers))    
+                    only_triggers = only_triggers, color = True))    
         return overlap_intensity
             
     def background_subtraction(self, ignore_triggers = False, 
@@ -144,6 +153,7 @@ class wampImageProc:
             self.ignore_events = self.trigger_dates      
         else:
             self.ignore_events = []
+        
         for subdir in self.sub_directories:
             #subdir is a string
             #Call self._background_subtraction. Return value is Null
@@ -153,9 +163,20 @@ class wampImageProc:
                     ignore_triggers = ignore_triggers, 
                     only_triggers = only_triggers)     
             
+    def display_images(self):
+        cv2.namedWindow('frame1', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('frame1', 1200,1200) 
+        #cv2.namedWindow('frame2', cv2.WINDOW_NORMAL)
+        #cv2.resizeWindow('frame2', 800,800) 
+        for subdir in self.sub_directories:           
+            #print(subdir)
+            self._display_images(subdir + "Manta 1/*.jpg", 
+                    subdir + "Manta 2/*.jpg")         
+            
             
     def single_directiory_background_subtraction(self, directory, 
-                                                 only_triggers = False):
+                                                 only_triggers = False,
+                                                 display_overlap= True):
         '''
         Runs background subtraction on all images in desired subfolder location
         
@@ -170,7 +191,7 @@ class wampImageProc:
         #Run background subtraction
         self._background_subtraction(dir1, dir2, overlap = True, 
                             display_images = True, color = True,
-                            display_overlap= True, flag = True,
+                            display_overlap= display_overlap, flag = True,
                             only_triggers = only_triggers)
             
         
@@ -344,8 +365,6 @@ class wampImageProc:
             #Kernel for median blur
             kernel = np.ones((5,5),np.uint8)
             for fname1, fname2 in images:
-                
-                
                 """
                 Loop through all image frames and run background subtraction.
                 If overlap is selected, compare the overlap between the two 
@@ -358,11 +377,11 @@ class wampImageProc:
                     img1 = cv2.imread(fname1)
                     img2 = cv2.imread(fname2)
                     #Apply the mask
-                    fgmask1 = fgbg1.apply(img1)
-                    fgmask2 = fgbg2.apply(img2)
+                    img1b = fgbg1.apply(img1)
+                    img2b = fgbg2.apply(img2)
                     #Apply a median blur to reduce noise
-                    blur1 = cv2.medianBlur(fgmask1, 3)
-                    blur2 = cv2.medianBlur(fgmask2, 3)
+                    blur1 = cv2.medianBlur(img1b, 3)
+                    blur2 = cv2.medianBlur(img2b, 3)
                     #Display images
                         #If cntrl + c, exit          
                     if overlap:
@@ -391,6 +410,7 @@ class wampImageProc:
                             cv2.imshow('frame2',blur2)                            
                             
                     #If cntrl+c is pressed, exit
+                    #time.sleep(0.1)
                     if display_images or display_overlap:
                         k = cv2.waitKey(1)
                         if k == 99:
@@ -400,6 +420,38 @@ class wampImageProc:
                 #Return list of overlap intensities or empty list
             return overlap_intensity
         return []
+    
+    def _display_images(self, d1, d2):
+        images1 = self._get_paths(d1)
+        images2 = self._get_paths(d2)
+        images = zip(images1, images2)
+        
+        for fname1, fname2 in images:
+            
+            #print(fname1)
+            #date_time1 = fname1.split("/")
+            #if date_time1[-1][:-7] not in self.ignore_events:
+            signal.signal(signal.SIGINT, self._sigint_handler)
+            img1 = cv2.imread(fname1)
+            #img2 = cv2.imread(fname2)
+            cv2.imshow('frame1',img1)
+            #cv2.imshow('frame2',img2)
+        
+            k = cv2.waitKey(1)
+            if k == 13:
+                date_time1 = fname1.split("/")[-1][:-7]
+                open_directory = os.getcwd()
+                open_directory = open_directory.split('/')
+                open_directory = open_directory[:len(open_directory)-1]
+                open_directory = "/".join(open_directory) + '/data/fish_present'
+                with open(open_directory+'/dates.txt', 'a+') as f:
+                    f.write(date_time1+'\n')   
+                    msg = 'Saved data! File: %s' % (date_time1)
+                    logging.info(msg)
+            if k == 99:
+                cv2.destroyAllWindows()
+                sys.exit()  
+        
     
     def _sigint_handler(self, signum, frame):
         """
@@ -721,7 +773,8 @@ class calibration(imageTransforms):
             cv2.imshow('img1', img1)
             cv2.imshow('img2', img2)
             if i == 1:
-                print("Click ENTER if both checkerboards are visable to save checkerboards for calibration")
+                print("Click ENTER if both checkerboards are" /
+                      "visable to save checkerboards for calibration")
                 #First loop, wait for a couple seconds
                 cv2.waitKey(5000)
             k = cv2.waitKey(1000)
@@ -850,7 +903,7 @@ class calibration(imageTransforms):
         print('Translation Vector', T)
         print('Essential Matrix', E)
         print('Fundemental Matrix', F)
-        print('Transformation Matrix (RT)', np.dot(R,T))
+        print('Transformation (RT)', np.dot(R,T))
     
         if save:
             np.savetxt(stereo_save_path + '/rotation_matrix.csv', 

@@ -12,4 +12,5 @@ if __name__ == '__main__':
     
     folder_location = "/media/WAMP/2018_10_16"
     WIP = wampImageProc(root_dir = folder_location, hour_min = 10, hour_max = 16)
-    overlap_intensity = WIP.image_overlap(display_overlap = False)
+    overlap_intensity = WIP.image_overlap(display_overlap = True, display_images = True)
+    
