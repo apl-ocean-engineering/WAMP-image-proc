@@ -130,13 +130,17 @@ class wampImageProc:
         for subdir in self.sub_directories:
             #subdir is a string
             #Call self._background_subtraction with overlap on
-            overlap_intensity.extend(
-                    self._background_subtraction(subdir + "Manta 1/*.jpg", 
-                    subdir + "Manta 2/*.jpg", overlap = True, 
-                    display_images = display_images, 
-                    display_overlap= display_overlap,
-                    ignore_triggers = ignore_triggers, 
-                    only_triggers = only_triggers, color = True))    
+            print(subdir)
+            date =  subdir.split('/')[4].split(' ')
+            date = date[0] + '_' + date[1]
+            if date in self.trigger_dates:
+                overlap_intensity.extend(
+                        self._background_subtraction(subdir + "Manta 1/*.jpg", 
+                        subdir + "Manta 2/*.jpg", overlap = True, 
+                        display_images = display_images, 
+                        display_overlap= display_overlap,
+                        ignore_triggers = ignore_triggers, 
+                        only_triggers = only_triggers, color = True, date = date))    
         return overlap_intensity
             
     def background_subtraction(self, ignore_triggers = False, 
@@ -163,15 +167,25 @@ class wampImageProc:
                     ignore_triggers = ignore_triggers, 
                     only_triggers = only_triggers)     
             
-    def display_images(self):
+    def display_images(self, ignore_dates = False,  display_images = [], time_delay = 1):
+        """
+        Display all images in a directory
+        """
         cv2.namedWindow('frame1', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('frame1', 1200,1200) 
         #cv2.namedWindow('frame2', cv2.WINDOW_NORMAL)
         #cv2.resizeWindow('frame2', 800,800) 
-        for subdir in self.sub_directories:           
-            #print(subdir)
-            self._display_images(subdir + "Manta 1/*.jpg", 
-                    subdir + "Manta 2/*.jpg")         
+        for subdir in self.sub_directories: 
+            date =  subdir.split('/')[4].split(' ')
+            date = date[0] + '_' + date[1]
+            if ignore_dates:
+                if date in display_images:
+                    #print(subdir)
+                    self._display_images(subdir + "Manta 1/*.jpg", 
+                            subdir + "Manta 2/*.jpg", time_delay = time_delay)   
+            else:
+                self._display_images(subdir + "Manta 1/*.jpg", 
+                        subdir + "Manta 2/*.jpg", time_delay = time_delay)                
             
             
     def single_directiory_background_subtraction(self, directory, 
@@ -301,7 +315,7 @@ class wampImageProc:
     def _background_subtraction(self, d1, d2, overlap = False, 
                                 display_images = False, color = False, 
                                 display_overlap=False, flag = False, 
-                                ignore_triggers = False, only_triggers = False):
+                                ignore_triggers = False, only_triggers = False, date = None):
         """
         Run background subtraction algorithm using openCv 
         createBackgroundSubtractorMOG2. Will do background subtraction for all
@@ -364,6 +378,7 @@ class wampImageProc:
             overlap_intensity = []
             #Kernel for median blur
             kernel = np.ones((5,5),np.uint8)
+            i = 0
             for fname1, fname2 in images:
                 """
                 Loop through all image frames and run background subtraction.
@@ -371,6 +386,7 @@ class wampImageProc:
                 images
                 """
                 date_time1 = fname1.split("/")
+                #print(date_time1)
                 if date_time1[-1][:-7] not in self.ignore_events:
                     signal.signal(signal.SIGINT, self._sigint_handler)
                     #Read images and inport
@@ -413,15 +429,22 @@ class wampImageProc:
                     #time.sleep(0.1)
                     if display_images or display_overlap:
                         k = cv2.waitKey(1)
+                        #print('pics/' + date + '.png')
+                        #if k == 13:
+                        #cv2.imwrite('pics/' + date + str(i) + 'img.png', img1)
+                        #cv2.imwrite('pics/' + date + str(i) + 'blur.png', blur1)
+                        #cv2.imwrite('pics/' + date + str(i) + 'img.png', img1)
+                        #cv2.imwrite('pics/' + date + str(i) + 'blur.png', blur1)                        
                         if k == 99:
                             cv2.destroyAllWindows()
                             sys.exit()  
+                    i+=1
                             
                 #Return list of overlap intensities or empty list
             return overlap_intensity
         return []
     
-    def _display_images(self, d1, d2):
+    def _display_images(self, d1, d2, time_delay=1):
         images1 = self._get_paths(d1)
         images2 = self._get_paths(d2)
         images = zip(images1, images2)
@@ -437,7 +460,7 @@ class wampImageProc:
             cv2.imshow('frame1',img1)
             #cv2.imshow('frame2',img2)
         
-            k = cv2.waitKey(1)
+            k = cv2.waitKey(time_delay)
             if k == 13:
                 date_time1 = fname1.split("/")[-1][:-7]
                 open_directory = os.getcwd()
@@ -653,14 +676,17 @@ class imageTransforms(object):
         
         #Must be float 32s to work in OpenCV
         pnts1 = np.float32(pnts1)
-        pnts2 = np.float32(pnts2)  
+        pnts2 = np.float32(pnts2)
+        '''
         pnts1 = [pnts1]
         pnts2 = [pnts2]
         for i in range(0, 4):
             points1.append(pnts1)
             points2.append(pnts2)
+        
         return points1[0], points2[0]
-    
+        '''
+        return pnts1, pnts2
     
     def _mouse_click1(self,event,x,y,flags,param):
         """
@@ -835,6 +861,55 @@ class calibration(imageTransforms):
         print('Intrinsic Matrix Camera 2', mtx1)
         print('Distortion Coefficients Camera 2', dist1)
         
+        
+    def find_essential(self, fname1, fname2, save = False, 
+                         load_intrinsics = True, intrinsics_load_path = ' ', 
+                         stereo_save_path = ' ', mtx1 = None, dist1 = None, 
+                         mtx2 = None, dist2 = None):
+        if load_intrinsics:
+            #Try to load intrnsic values if specified, otherwise raise error
+            try:
+                mtx1, dist1 = self._load_intrinsics(
+                        intrinsics_load_path + '/camera1')
+                mtx2, dist2 = self._load_intrinsics(
+                        intrinsics_load_path + '/camera2')
+            except:
+                raise AttributeError('No Intrinsics found')
+        #Check that the matricies are of proper form
+        else:
+            if not type(mtx1) != type(np.array()):
+                raise ValueError("R is not of type np.array")
+            if not type(dist1) != type(np.array()):
+                raise ValueError("R is not of type np.array")
+            if not type(mtx2) != type(np.array()):
+                raise ValueError("R is not of type np.array")
+            if not type(dist2) != type(np.array()):
+                raise ValueError("R is not of type np.array")  
+
+        img_name = self._image_mouse_click_directory(fname1, fname2)
+        #Return clicked points
+        pnts1, pnts2 = self.get_points()
+        img = cv2.imread(img_name)
+        imshape = (img.shape[0], img.shape[1])    
+        
+        #print(pnts1)
+        E = cv2.findEssentialMat(pnts1, pnts2)#, focal = mtx1[0,0], pp = (mtx1[0,2], mtx1[1,2]))
+        R1 = np.zeros((3,3))
+        R2 = np.zeros((3,3))
+        t = np.zeros((3,1))
+        
+        cv2.decomposeEssentialMat(E[0], R1, R2, t)   
+        print(R1, R2)
+        
+        if save:
+            np.savetxt(stereo_save_path + '/rotation_matrix.csv', 
+                       R2, fmt='%1.3f', delimiter=",")
+            np.savetxt(stereo_save_path + '/translation_matrix.csv', 
+                       t, fmt='%1.3f', delimiter=",")
+            np.savetxt(stereo_save_path + '/essential_matrix.csv', 
+                       E[0], fmt='%1.3f', delimiter=",")
+        
+        
     def stereo_calibrate(self, fname1, fname2, save = False, 
                          load_intrinsics = True, intrinsics_load_path = ' ', 
                          stereo_save_path = ' ', mtx1 = None, dist1 = None, 
@@ -879,10 +954,10 @@ class calibration(imageTransforms):
             if not type(dist2) != type(np.array()):
                 raise ValueError("R is not of type np.array")   
         #Get corresponding images
-        self._image_mouse_click(fname1, fname2)
+        img_name = self._image_mouse_click_directory(fname1, fname2)
         #Return clicked points
         pnts1, pnts2 = self.get_points()
-        img = cv2.imread(fname1)
+        img = cv2.imread(img_name)
         imshape = (img.shape[0], img.shape[1])
         #3d points, arbitrary
         objp = np.zeros((6*7,3), np.float32)
@@ -913,7 +988,58 @@ class calibration(imageTransforms):
             np.savetxt(stereo_save_path + '/essential_matrix.csv', 
                        E, fmt='%1.3f', delimiter=",")
             np.savetxt(stereo_save_path + '/fundemental_matrix.csv', 
-                       F, fmt='%1.3f', delimiter=",")             
+                       F, fmt='%1.3f', delimiter=",")  
+            
+    
+    
+    def get_instrinsics(self, load_path):
+            try:
+                mtx1, dist1 = self._load_intrinsics(
+                        load_path + '/camera1')
+                mtx2, dist2 = self._load_intrinsics(
+                        load_path + '/camera2')
+            except:
+                raise AttributeError('No Intrinsics found')
+                
+            return mtx1, dist1, mtx2, dist2
+    
+    def get_extrinsics(self, load_path):
+        try:
+            E,R,T = self._load_extrinsics(
+                    load_path)
+        except:
+            raise AttributeError('No Intrinsics found')
+        print(R)
+        print(T)
+        return E,R,T      
+    
+    def get_mouse_clicks(self, fname1, fname2):
+        cv2.namedWindow('image1', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('image1', 1800,1800)
+        cv2.namedWindow('image2', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('image2', 1800,1800)
+        #Define mouse callback functions
+        cv2.setMouseCallback('image1',self._mouse_click1)
+        cv2.setMouseCallback('image2',self._mouse_click2)        
+        print("Click on the same point in both images")
+        print("Press enter to move to next corresponding images")
+        print("Press 'f' to finish")
+        print("Press cntrl+c to quit")
+        signal.signal(signal.SIGINT, self._sigint_handler)
+        self.img1 = cv2.imread(fname1)
+        self.img2 = cv2.imread(fname2)
+        
+        cv2.imshow('image1', self.img1)      
+        cv2.imshow('image2', self.img2)
+        k = cv2.waitKey(0)
+        if k == 99:
+            cv2.destroyAllWindows()
+            sys.exit()  
+        if k == 102:
+            cv2.destroyAllWindows()
+        cv2.destroyAllWindows()   
+        
+        return self.x1_points, self.y1_points, self.x2_points, self.y2_points
 
     def _load_intrinsics(self, load_path):
         """
@@ -931,7 +1057,29 @@ class calibration(imageTransforms):
         
         mtx.reshape((3,3))
         
-        return mtx, dist         
+        return mtx, dist   
+
+    def _load_extrinsics(self, load_path):
+        """
+        Load camera intrinsics
+        Args:
+            load_path(str): Path to load intrinsics from
+        Returns:
+            mtx(np.array): Intrinsic matrix
+            dist(np.array): Distortion matrix
+        """
+        E = np.array(np.loadtxt(load_path + '/essential_matrix.csv', 
+                                  dtype = float, delimiter=','))
+        R = np.array(np.loadtxt(load_path + '/rotation_matrix.csv',
+                                   dtype = float, delimiter=','))      
+        T = np.array(np.loadtxt(load_path + '/translation_matrix.csv',
+                                   dtype = float, delimiter=','))          
+        
+        E.reshape((3,3))
+        R.reshape((3,3))
+        
+        
+        return E,R,T         
 
     def _mouse_click1(self,event,x,y,flags,param):
         """
@@ -994,7 +1142,51 @@ class calibration(imageTransforms):
             sys.exit()  
         if k == 102:
             cv2.destroyAllWindows()
-        cv2.destroyAllWindows()      
+        cv2.destroyAllWindows()    
+        
+    def _image_mouse_click_directory(self, fname1_path, fname2_path):
+        """
+        Determine coressponding image points between the frames
+        
+        Will display two images. User must click on identical point
+        in two frames. x#_points, and y#_points will populate as the user 
+        clicks on points  
+        
+        Args:
+            fname1, fname2 (str): Two paths pointing to calibration image frame
+        """
+        cv2.namedWindow('image1', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('image1', 1200,1200)
+        cv2.namedWindow('image2', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('image2', 1200,1200)
+        #Define mouse callback functions
+        cv2.setMouseCallback('image1',self._mouse_click1)
+        cv2.setMouseCallback('image2',self._mouse_click2)        
+        print("Click on the same point in both images")
+        print("Press enter to move to next corresponding images")
+        print("Press 'f' to finish")
+        print("Press q to quit")
+        imgs1 = sorted(glob.glob(fname1_path + "/*.jpg"))
+        imgs2 = sorted(glob.glob(fname2_path + "/*.jpg"))
+        images = zip(imgs1, imgs2)
+        for fname1, fname2 in images:
+            signal.signal(signal.SIGINT, self._sigint_handler)
+            self.img1 = cv2.imread(fname1)
+            self.img2 = cv2.imread(fname2)
+            
+            cv2.imshow('image1', self.img1)      
+            cv2.imshow('image2', self.img2)
+            k = cv2.waitKey(0)
+            
+            
+            if k == 113:
+                cv2.destroyAllWindows()
+                sys.exit()    
+            if k == 102:
+                break
+        
+        return fname1
+                
 
     
     
